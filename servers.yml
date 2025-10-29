@@ -30,7 +30,6 @@ Parameters:
     Default: 16
     Description: Root EBS volume size (GB, gp3)
 
-  # SSH controls
   EnableSSH:
     Type: String
     AllowedValues: [ 'true', 'false' ]
@@ -45,7 +44,6 @@ Parameters:
     Default: ''
     Description: Existing EC2 KeyPair name in this region (required if EnableSSH='true')
 
-  # Ubuntu 22.04 AMI (region-agnostic via SSM)
   UbuntuAmi:
     Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
     Default: /aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id
@@ -55,7 +53,6 @@ Conditions:
   OpenSSH: !Equals [ !Ref EnableSSH, 'true' ]
 
 Resources:
-  # S3 for static content
   StaticBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -82,7 +79,6 @@ Resources:
             Action: s3:GetObject
             Resource: !Sub '${StaticBucket.Arn}/*'
 
-  # Security groups
   AlbSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -123,7 +119,6 @@ Resources:
         - Key: Name
           Value: !Sub '${EnvironmentName}-app-sg'
 
-  # IAM for instances (S3 Read-Only + SSM)
   InstanceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -154,7 +149,6 @@ Resources:
     Properties:
       Roles: [ !Ref InstanceRole ]
 
-  # Launch template 
   LaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
     Properties:
@@ -166,7 +160,6 @@ Resources:
         KeyName: !If [ UseKey, !Ref KeyName, !Ref 'AWS::NoValue' ]
         NetworkInterfaces:
           - DeviceIndex: 0
-            # Private subnets should not associate a public IP
             Groups: [ !Ref AppSecurityGroup ]
         BlockDeviceMappings:
           - DeviceName: /dev/sda1
@@ -179,15 +172,10 @@ Resources:
             #!/bin/bash
             set -euxo pipefail
             export DEBIAN_FRONTEND=noninteractive
-
             apt-get update -y
             apt-get install -y nginx awscli
             systemctl enable nginx
-
-            # Remove default Nginx config to avoid welcome page
             rm -f /etc/nginx/sites-enabled/default
-
-            # Create custom Nginx config
             cat <<'CONF' > /etc/nginx/conf.d/udagram.conf
             server {
                 listen 80 default_server;
@@ -200,14 +188,9 @@ Resources:
                 }
             }
             CONF
-
-            # Sync S3 content to Nginx root (Pulls static files from S3, fulfilling reviewer requirement)
             aws s3 sync s3://${StaticBucketName}/ /var/www/html/ --delete || true
-
-            # Restart Nginx to apply changes
             systemctl restart nginx
 
-  # ALB + TG + Listener
   TargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
@@ -248,14 +231,13 @@ Resources:
         - Type: forward
           TargetGroupArn: !Ref TargetGroup
 
-  # ASG (launches in private subnets)
   AutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
       VPCZoneIdentifier: !Split
         - ","
         - !ImportValue
-          Fn::Sub: '${EnvironmentName}-PrivateSubnets' # ⬅️ Corrected for private subnets
+          Fn::Sub: '${EnvironmentName}-PrivateSubnets'
       MinSize: !Ref MinSize
       MaxSize: !Ref MaxSize
       DesiredCapacity: !Ref DesiredCapacity
