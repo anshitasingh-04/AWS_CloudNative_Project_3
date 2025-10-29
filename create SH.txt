@@ -1,0 +1,5 @@
+aws cloudformation create-stack \
+--stack-name udagram-server \
+--template-body file://servers.yaml \
+--parameters file://app\ params.json \
+--capabilities CAPABILITY_NAMED_IAM
