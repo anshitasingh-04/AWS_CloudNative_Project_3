@@ -30,7 +30,6 @@ Parameters:
 
 Resources:
 
-  ### VPC and Subnets ###
   VPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -98,7 +97,6 @@ Resources:
         - Key: Name
           Value: !Sub '${EnvironmentName}-private-2'
 
-  ### Route Tables ###
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -197,7 +195,6 @@ Resources:
       RouteTableId: !Ref PrivateRouteTable2
       SubnetId: !Ref PrivateSubnet2
 
-  ### Security Groups ###
   ALBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -236,7 +233,6 @@ Resources:
         - Key: Name
           Value: !Sub '${EnvironmentName}-asg-sg'
 
-  ### ALB & Target Group ###
   ALBTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
@@ -266,7 +262,6 @@ Resources:
         - Type: forward
           TargetGroupArn: !Ref ALBTargetGroup
 
-  ### Launch Template & ASG ###
   AutoScalingLaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
     Properties:
